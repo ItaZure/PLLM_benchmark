@@ -209,37 +209,60 @@ async def recompute_status(db, eval_id: uuid.UUID) -> str:
     return "done"
 
 
+async def _execute_combos(eval_id, cancel_event, combo_filter=None):
+    """Run task×model combos, persisting one Result each.
+
+    combo_filter: if given, a set of (task_id, model_id, model_type) tuples —
+    only those combos run (used by rerun). None means run every combo.
+    """
+    async with AsyncSessionLocal() as db:
+        et_rows, em_rows, tasks, dim_prompts = await _load_plan(db, eval_id)
+
+    sem = asyncio.Semaphore(_CONCURRENCY)
+    coros = []
+    for et in et_rows:
+        task = tasks.get(et.task_id)
+        if task is None:
+            continue
+        system_prompt = dim_prompts.get(task.dimension_id)
+        for em in em_rows:
+            if combo_filter is not None \
+                    and (et.task_id, em.model_id, em.model_type) not in combo_filter:
+                continue
+            coros.append(
+                _run_one(eval_id, et, em, task, system_prompt, sem, cancel_event)
+            )
+    await asyncio.gather(*coros)
+
+
+async def _finalize(eval_id, cancel_event):
+    """Set the evaluation's terminal status after a run/rerun finishes."""
+    async with AsyncSessionLocal() as db:
+        evaluation = await db.get(Evaluation, eval_id)
+        if evaluation is None:
+            return
+        if cancel_event.is_set():
+            evaluation.status = "cancelled"
+        else:
+            evaluation.status = await recompute_status(db, eval_id)
+        evaluation.finished_at = datetime.now(timezone.utc)
+        await db.commit()
+
+
 async def _run_evaluation(eval_id: uuid.UUID, cancel_event: asyncio.Event):
     """Top-level coroutine: execute all combos, then finalize status."""
     try:
-        # Load the plan up front in a short-lived session.
-        async with AsyncSessionLocal() as db:
-            et_rows, em_rows, tasks, dim_prompts = await _load_plan(db, eval_id)
+        await _execute_combos(eval_id, cancel_event)
+        await _finalize(eval_id, cancel_event)
+    finally:
+        running_tasks.pop(eval_id, None)
 
-        sem = asyncio.Semaphore(_CONCURRENCY)
-        coros = []
-        for et in et_rows:
-            task = tasks.get(et.task_id)
-            if task is None:
-                continue
-            system_prompt = dim_prompts.get(task.dimension_id)
-            for em in em_rows:
-                coros.append(
-                    _run_one(eval_id, et, em, task, system_prompt, sem, cancel_event)
-                )
-        await asyncio.gather(*coros)
 
-        # Finalize evaluation status in a fresh session. Cancellation wins;
-        # otherwise derive from DB state (may already be 'done' if there were
-        # no open tasks, or 'scoring' if open tasks await blind scoring).
-        async with AsyncSessionLocal() as db:
-            evaluation = await db.get(Evaluation, eval_id)
-            if cancel_event.is_set():
-                evaluation.status = "cancelled"
-            else:
-                evaluation.status = await recompute_status(db, eval_id)
-            evaluation.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+async def _rerun_evaluation(eval_id, cancel_event, combo_filter):
+    """Re-run only the given combos (already cleared of their old Results)."""
+    try:
+        await _execute_combos(eval_id, cancel_event, combo_filter)
+        await _finalize(eval_id, cancel_event)
     finally:
         running_tasks.pop(eval_id, None)
 
@@ -250,3 +273,67 @@ def start_run(eval_id: uuid.UUID) -> RunContext:
     ctx.task = asyncio.create_task(_run_evaluation(eval_id, ctx.cancel_event))
     running_tasks[eval_id] = ctx
     return ctx
+
+
+def start_rerun(eval_id: uuid.UUID, combo_filter: set) -> RunContext:
+    """Register and launch a background rerun of specific combos."""
+    ctx = RunContext()
+    ctx.task = asyncio.create_task(
+        _rerun_evaluation(eval_id, ctx.cancel_event, combo_filter)
+    )
+    running_tasks[eval_id] = ctx
+    return ctx
+
+
+async def heal_orphaned_runs() -> list[str]:
+    """Recover evaluations left at 'running' by a process restart.
+
+    The run registry lives in memory (single-worker design), so a restart
+    orphans any in-flight evaluation: its Results are in the DB but no coroutine
+    remains to finalize its status. On startup we recompute each such
+    evaluation from DB state and backfill any never-persisted combos as
+    'failed' so the count completes and it flows to 'scoring'/'done'.
+
+    Returns the ids healed, for logging.
+    """
+    healed: list[str] = []
+    async with AsyncSessionLocal() as db:
+        stuck = (await db.execute(
+            select(Evaluation).where(Evaluation.status == "running")
+        )).scalars().all()
+        stuck_ids = [e.id for e in stuck]
+
+    for eval_id in stuck_ids:
+        async with AsyncSessionLocal() as db:
+            et_rows, em_rows, tasks, _ = await _load_plan(db, eval_id)
+            # Which (task, model) combos already have a Result?
+            existing = set((
+                (r.task_id, r.model_id, r.model_type)
+                for r in (await db.execute(
+                    select(Result).where(Result.evaluation_id == eval_id)
+                )).scalars().all()
+            ))
+            # Backfill missing combos as failed (the run was interrupted).
+            added = 0
+            for et in et_rows:
+                if tasks.get(et.task_id) is None:
+                    continue
+                for em in em_rows:
+                    key = (et.task_id, em.model_id, em.model_type)
+                    if key not in existing:
+                        db.add(Result(
+                            evaluation_id=eval_id, task_id=et.task_id,
+                            model_id=em.model_id, model_type=em.model_type,
+                            status="failed", auto_scored=False,
+                            error="进程重启中断，未完成生成",
+                        ))
+                        added += 1
+            if added:
+                await db.flush()
+            evaluation = await db.get(Evaluation, eval_id)
+            evaluation.status = await recompute_status(db, eval_id)
+            if evaluation.status in ("done", "cancelled"):
+                evaluation.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+            healed.append(str(eval_id))
+    return healed

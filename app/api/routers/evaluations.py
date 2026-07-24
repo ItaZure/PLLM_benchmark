@@ -66,6 +66,12 @@ async def list_evaluations(db: AsyncSession = Depends(get_db)) -> dict:
         )
         # Does this evaluation contain any open-type task? (needs blind scoring)
         open_ids = await _open_task_ids(db, e.id)
+        failed_count = await db.scalar(
+            select(func.count()).select_from(Result).where(
+                Result.evaluation_id == e.id,
+                Result.status.in_(["failed", "cancelled"]),
+            )
+        ) or 0
         items.append(
             EvaluationListItem(
                 id=e.id, name=e.name, status=e.status,
@@ -73,6 +79,7 @@ async def list_evaluations(db: AsyncSession = Depends(get_db)) -> dict:
                 created_at=e.created_at, finished_at=e.finished_at,
                 has_open_tasks=len(open_ids) > 0,
                 awaiting_scoring=(e.status == "scoring"),
+                failed_count=failed_count,
             ).model_dump()
         )
     return {"data": items, "message": "ok"}
@@ -203,6 +210,58 @@ async def cancel_evaluation(
         raise HTTPException(status_code=409, detail="评测不在运行中，无法取消")
     ctx.cancel_event.set()
     return {"data": {"status": "cancelling"}, "message": "ok"}
+
+
+@router.post("/{eval_id}/rerun")
+async def rerun_evaluation(
+    eval_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Re-run only the failed/cancelled combos of an evaluation.
+
+    Lets a run recover from transient errors or a mid-run cancel without
+    redoing the successful combos. The old failed/cancelled Result rows are
+    deleted and regenerated; blind-scoring sessions for affected open tasks are
+    dropped so they re-freeze with the full (possibly larger) success set.
+    """
+    e = await _get_or_404(db, eval_id)
+    if eval_id in eval_runner.running_tasks or e.status == "running":
+        raise HTTPException(status_code=409, detail="评测正在运行中")
+
+    bad = (await db.execute(
+        select(Result).where(
+            Result.evaluation_id == eval_id,
+            Result.status.in_(["failed", "cancelled"]),
+        )
+    )).scalars().all()
+    if not bad:
+        raise HTTPException(status_code=409, detail="没有失败或已取消的结果需要重跑")
+
+    combo_filter = set()
+    affected_task_ids = set()
+    for r in bad:
+        combo_filter.add((r.task_id, r.model_id, r.model_type))
+        affected_task_ids.add(r.task_id)
+        await db.delete(r)
+
+    # Drop blind-scoring sessions for affected open tasks so the shuffled set
+    # is re-frozen after the rerun (a failed→success flip adds a new entry).
+    for tid in affected_task_ids:
+        t = await db.get(Task, tid)
+        if t is not None and t.task_type == "open":
+            sess = (await db.execute(
+                select(OpenScoringSession).where(
+                    OpenScoringSession.evaluation_id == eval_id,
+                    OpenScoringSession.task_id == tid,
+                )
+            )).scalar_one_or_none()
+            if sess is not None:
+                await db.delete(sess)
+
+    e.status = "running"
+    e.finished_at = None
+    await db.commit()
+    eval_runner.start_rerun(eval_id, combo_filter)
+    return {"data": {"status": "running", "rerun": len(combo_filter)}, "message": "ok"}
 
 
 @router.delete("/{eval_id}")

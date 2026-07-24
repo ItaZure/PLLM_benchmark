@@ -264,7 +264,8 @@ Chat 模型与图片生成模型共用同一套接口结构，仅前缀不同：
 ### POST /api/evaluations/{id}/run — 启动运行（异步，仅一次）
 
 - 后台 asyncio 任务执行所有 task × model 组合，`status='running'`。
-- **仅 `status='pending'` 且无结果的评测可启动**；已运行过（非 pending 或已有结果）返回 409 `该评测已运行过，请新建评测重新组卷`；运行中重复调用返回 409。**不再清空旧结果重跑。**
+- **仅 `status='pending'` 且无结果的评测可启动**；已运行过（非 pending 或已有结果）返回 409 `该评测已运行过，请新建评测重新组卷`；运行中重复调用返回 409。**不再清空旧结果重跑。**（失败的 combo 用 `/rerun` 局部补跑。）
+- **启动自愈**：运行注册表在内存中（单 worker 设计），进程重启会孤立在跑的评测。应用 startup 时 `eval_runner.heal_orphaned_runs()` 扫描所有卡 `running` 的评测，回填从未落库的 combo 为 `failed`（error 标注"进程重启中断"），再 `recompute_status` 复原为 `scoring`/`done`。
 - chat 模型走 `/v1/chat/completions` SSE streaming 采集 TTFT / 总耗时 / 字符数 / 字符每秒。
 - **图片模型**按 `provider_mode` 分派，`ttft_ms == total_duration_ms`（出图总耗时），字符类指标为 null，`score=null` 留待盲评：
   - `poe_chat`：`POST {base}/v1/chat/completions`，`stream=false`，user prompt 放 messages（无 system），合并 default_params；从 `choices[0].message.content` 用正则 `!\[[^\]]*\]\((https?://[^\s)]+)\)` 提取图片 URL 存 `output_text`；提取不到 → `status='failed'`，`error` 为响应片段。
@@ -280,6 +281,14 @@ Chat 模型与图片生成模型共用同一套接口结构，仅前缀不同：
 - 触发 `cancel_event`：chat streaming 循环、信号量入口、图片异步轮询循环均会检查并中断。
 - 已完成的结果保留；进行中/未开始的组合记为 `status='cancelled'`，评测最终 `status='cancelled'`。
 - 响应 `{"data": {"status": "cancelling"}}`（实际状态转移由后台任务收尾）。
+
+### POST /api/evaluations/{id}/rerun — 重跑失败/取消的结果
+
+- 只重跑 `status in (failed, cancelled)` 的 combo；成功的结果保留不动。运行中或无失败结果返回 409。
+- 删除旧的 failed/cancelled Result 行后台重新生成；涉及开放型任务时**删除其盲评 session**，重跑后用完整成功集重新洗牌冻结（避免 failed→success 的新输出漏进盲评）。
+- 评测重置为 `running`，收尾后由 `recompute_status` 复原为 `scoring`/`done`。
+- 响应 `{"data": {"status": "running", "rerun": N}}`（N 为重跑的 combo 数）。
+- 列表项新增 `failed_count` 字段供前端决定是否显示「重跑失败」入口。
 
 ### DELETE /api/evaluations/{id} — 删除评测
 

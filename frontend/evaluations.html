@@ -73,6 +73,11 @@
         // Only 'done' evaluations expose a 查看 (detail) entry — this is the
         // hard gate that prevents opening the detail page before unblinding.
         const inProgress = e.status === "running" || e.status === "scoring";
+        // 重跑 available whenever there are failed/cancelled combos and the
+        // evaluation isn't actively running.
+        const rerun = (e.failed_count > 0 && e.status !== "running")
+          ? `<button data-rerun="${e.id}" data-name="${escapeAttr(e.name)}" data-n="${e.failed_count}" class="ml-3 text-[12px] text-[#1d4ed8] hover:underline">重跑失败(${e.failed_count})</button>`
+          : "";
         let badge, action;
         if (e.status === "done") {
           badge = evalStatusBadge("done");
@@ -90,6 +95,7 @@
           badge = evalStatusBadge(e.status);
           action = `<span class="text-[12px] text-black/30">—</span>`;
         }
+        action += rerun;
         return `
         <tr class="border-t border-black/[0.05] ${i % 2 ? "bg-[#fcfcfc]" : ""}">
           <td class="px-3 py-2.5 font-medium">${escapeHtml(e.name)}</td>
@@ -108,6 +114,18 @@
           try {
             await apiFetch(`/evaluations/${btn.dataset.del}`, { method: "DELETE" });
             toast("已删除", "ok");
+            load();
+          } catch (err) {
+            toast(err.message, "error");
+          }
+        };
+      });
+      tbody.querySelectorAll("button[data-rerun]").forEach((btn) => {
+        btn.onclick = async () => {
+          if (!confirm(`重跑评测「${btn.dataset.name}」的 ${btn.dataset.n} 个失败/取消结果？`)) return;
+          try {
+            const r = await apiFetch(`/evaluations/${btn.dataset.rerun}/rerun`, { method: "POST" });
+            toast(`已开始重跑 ${r.data.rerun} 个结果`, "ok");
             load();
           } catch (err) {
             toast(err.message, "error");

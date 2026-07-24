@@ -37,6 +37,8 @@ class EvaluationListItem(BaseModel):
     # "评测中" (user-visible) = status in {running, scoring}; only 'done' -> 查看.
     has_open_tasks: bool = False
     awaiting_scoring: bool = False
+    #   failed_count — failed/cancelled results eligible for 重跑 (rerun)
+    failed_count: int = 0
 
 
 class ResultItem(BaseModel):
