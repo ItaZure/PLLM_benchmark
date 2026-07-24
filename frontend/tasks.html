@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>任务管理 · PLLM Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); text-decoration:none; }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+  tbody tr:hover { background:#f5f5f5; }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:rgba(0,0,0,.4); box-shadow:0 0 0 3px rgba(0,0,0,.06); }
+  .drawer-mask { transition: opacity .25s ease-out; }
+  .drawer-panel { transition: transform .25s cubic-bezier(0.4,0,0.2,1); }
+  .spin { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <div id="sidebar"></div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[18px] font-semibold">任务管理</h1>
+        <span id="count" class="text-[12px] text-black/45 mono">共 0 个</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="filterDim" class="h-8 px-2.5 text-[13px] border border-black/12 rounded-md bg-white">
+          <option value="">全部维度</option>
+        </select>
+        <button id="btnNew" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98] transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新增任务
+        </button>
+      </div>
+    </header>
+    <main class="flex-1 overflow-auto p-6">
+      <div class="border border-[var(--border)] rounded-lg overflow-hidden">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-[#fafafa] text-left text-[11px] uppercase tracking-wide text-black/50 font-medium">
+              <th class="h-9 px-3 font-medium">任务名</th>
+              <th class="h-9 px-3 font-medium">所属维度</th>
+              <th class="h-9 px-3 font-medium">类型</th>
+              <th class="h-9 px-3 font-medium">提示词</th>
+              <th class="h-9 px-3 font-medium">创建时间</th>
+              <th class="h-9 px-3 font-medium text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rows" class="text-[13px]"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="drawer" class="fixed inset-0 z-40 hidden">
+  <div id="drawerMask" class="drawer-mask absolute inset-0 bg-black/40 opacity-0"></div>
+  <div id="drawerPanel" class="drawer-panel absolute right-0 top-0 h-full w-[520px] bg-white border-l border-[var(--border)] shadow-[-8px_0_32px_rgba(0,0,0,0.08)] flex flex-col translate-x-full">
+    <div class="h-14 shrink-0 flex items-center justify-between px-5 border-b border-[var(--border)]">
+      <h2 id="drawerTitle" class="text-[14px] font-semibold">新增任务</h2>
+      <button id="btnClose" class="w-7 h-7 rounded-md hover:bg-[#f5f5f5] flex items-center justify-center text-black/50">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-auto px-5 py-5 space-y-4">
+      <div>
+        <label class="block text-[13px] font-medium mb-1.5">所属维度 <span class="text-red-600">*</span></label>
+        <select id="fDim" class="w-full h-8 px-2.5 text-[13px] border border-black/12 rounded-md bg-white"></select>
+      </div>
+      <div>
+        <label class="block text-[13px] font-medium mb-1.5">任务名称 <span class="text-red-600">*</span></label>
+        <input id="fName" placeholder="如 三角函数化简" class="w-full h-8 px-2.5 text-[13px] border border-black/12 rounded-md placeholder:text-black/35" />
+      </div>
+      <div>
+        <label class="block text-[13px] font-medium mb-1.5">任务类型 <span class="text-red-600">*</span></label>
+        <select id="fType" class="w-full h-8 px-2.5 text-[13px] border border-black/12 rounded-md bg-white">
+          <option value="open">开放型（人工盲评）</option>
+          <option value="closed">封闭型（正则自动判分）</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[13px] font-medium mb-1.5">任务提示词 <span class="text-red-600">*</span></label>
+        <textarea id="fPrompt" rows="5" class="w-full px-2.5 py-2 text-[13px] border border-black/12 rounded-md resize-y leading-relaxed" placeholder="发送给模型的任务提示词"></textarea>
+      </div>
+      <div id="closedFields" class="space-y-4">
+        <div>
+          <label class="block text-[13px] font-medium mb-1.5">答案提取正则 <span class="text-red-600">*</span></label>
+          <input id="fRegex" placeholder="[A-D]" class="w-full h-8 px-2.5 text-[13px] mono border border-black/12 rounded-md placeholder:text-black/35" />
+          <p class="mt-1 text-[12px] text-black/45">默认 <span class="mono">[A-D]</span> 匹配选择题答案；可改写，带捕获组时取第一个组。</p>
+          <p class="mt-1 text-[12px] text-black/45">从模型输出中提取答案并与标准答案比对。</p>
+        </div>
+        <div>
+          <label class="block text-[13px] font-medium mb-1.5">标准答案 <span class="text-red-600">*</span></label>
+          <input id="fExpected" placeholder="1" class="w-full h-8 px-2.5 text-[13px] mono border border-black/12 rounded-md placeholder:text-black/35" />
+        </div>
+      </div>
+      <div id="openFields" class="hidden">
+        <label class="block text-[13px] font-medium mb-1.5">评分说明 / Rubric <span class="text-[11px] text-black/40 font-normal">（选填）</span></label>
+        <textarea id="fRubric" rows="4" class="w-full px-2.5 py-2 text-[13px] border border-black/12 rounded-md resize-y leading-relaxed" placeholder="盲评时展示给自己看的评分标准，可留空"></textarea>
+      </div>
+    </div>
+    <div class="shrink-0 flex items-center justify-between gap-2 px-5 py-3.5 border-t border-[var(--border)]">
+      <button id="btnGen" disabled class="h-8 px-3.5 rounded-md border border-black/16 text-[13px] text-black/75 hover:bg-[#f5f5f5] disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1.5">
+        <svg id="genIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z"/></svg>
+        <span id="genLabel">自动生成</span>
+      </button>
+      <div class="flex items-center gap-2">
+        <button id="btnCancel" class="h-8 px-3.5 rounded-md border border-black/16 text-[13px] text-black/75 hover:bg-[#f5f5f5]">取消</button>
+        <button id="btnSave" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98]">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/tasks-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PLLM Benchmark · Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family: 'Inter', -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+</style>
+</head>
+<body class="bg-white antialiased">
+  <div class="min-h-screen flex items-center justify-center px-6 py-16">
+    <div class="w-full max-w-3xl">
+      <div class="mb-8">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-7 h-7 rounded-md bg-[#1a1a1a] flex items-center justify-center text-white text-[13px] font-semibold">P</div>
+          <span class="text-[15px] font-semibold">PLLM Benchmark</span>
+        </div>
+        <h1 class="text-[18px] font-semibold mb-1">界面 Demo 索引</h1>
+        <p class="text-[13px] text-black/45">个人 LLM 评测工具 · 原生 HTML + TailwindCSS · mock 数据，未接后端</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <a href="model-management.html" class="group block border border-[var(--border)] rounded-lg p-4 hover:border-black/16 hover:bg-[#fafafa] transition-colors duration-200">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[11px] font-medium text-black/40 mono">01</span>
+            <span class="text-[14px] font-semibold">模型管理</span>
+          </div>
+          <p class="text-[12px] text-black/55 leading-relaxed">Chat 模型列表、状态标签、可用性测试、新增/编辑 Drawer（base URL / key / 默认参数 JSON）</p>
+        </a>
+
+        <a href="dimensions.html" class="group block border border-[var(--border)] rounded-lg p-4 hover:border-black/16 hover:bg-[#fafafa] transition-colors duration-200">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[11px] font-medium text-black/40 mono">02</span>
+            <span class="text-[14px] font-semibold">维度管理</span>
+          </div>
+          <p class="text-[12px] text-black/55 leading-relaxed">维度列表、可展开模型白名单（多选添加/移除）、新增/编辑表单（system_prompt 文本域）</p>
+        </a>
+
+        <a href="evaluation-run.html" class="group block border border-[var(--border)] rounded-lg p-4 hover:border-black/16 hover:bg-[#fafafa] transition-colors duration-200">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[11px] font-medium text-black/40 mono">03</span>
+            <span class="text-[14px] font-semibold">评测运行</span>
+          </div>
+          <p class="text-[12px] text-black/55 leading-relaxed">任务×模型进度矩阵、streaming 逐字输出、取消按钮、TTFT 与 字符/秒 指标</p>
+        </a>
+
+        <a href="blind-scoring.html" class="group block border border-[var(--border)] rounded-lg p-4 hover:border-black/16 hover:bg-[#fafafa] transition-colors duration-200">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[11px] font-medium text-black/40 mono">04</span>
+            <span class="text-[14px] font-semibold">盲评打分</span>
+          </div>
+          <p class="text-[12px] text-black/55 leading-relaxed">开放型任务多模型输出打乱为 输出 A/B/C 卡片、隐藏模型名、评分控件、提交打分</p>
+        </a>
+      </div>
+
+      <p class="mt-8 text-[11px] text-black/35">视觉规范见 <span class="mono">DESIGN.md</span></p>
+    </div>
+  </div>
+</body>
+</html>

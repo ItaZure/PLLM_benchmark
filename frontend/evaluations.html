@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>历史评测结果 · PLLM Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); text-decoration:none; }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+  tbody tr:hover { background:#f5f5f5; }
+  .spin { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <div id="sidebar"></div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[18px] font-semibold">历史评测结果</h1>
+        <span id="count" class="text-[12px] text-black/45 mono">共 0 个</span>
+      </div>
+      <a href="evaluations-new.html" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98] transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建评测
+      </a>
+    </header>
+    <main class="flex-1 overflow-auto p-6">
+      <div class="border border-[var(--border)] rounded-lg overflow-hidden">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-[#fafafa] text-left text-[11px] uppercase tracking-wide text-black/50 font-medium">
+              <th class="h-9 px-3 font-medium">名称</th>
+              <th class="h-9 px-3 font-medium">状态</th>
+              <th class="h-9 px-3 font-medium">任务数</th>
+              <th class="h-9 px-3 font-medium">模型数</th>
+              <th class="h-9 px-3 font-medium">创建时间</th>
+              <th class="h-9 px-3 font-medium text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rows" class="text-[13px]"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  document.getElementById("sidebar").innerHTML = renderSidebar("evaluations");
+  const POLL_MS = 4000;
+  let pollTimer = null;
+
+  async function load() {
+    try {
+      const res = await apiFetch("/evaluations");
+      const evals = res.data;
+      document.getElementById("count").textContent = `共 ${evals.length} 个`;
+      const tbody = document.getElementById("rows");
+      if (evals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-10 text-center text-black/40 text-[13px]">还没有评测，点击右上角新建</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = evals.map((e, i) => {
+        // User-visible status: running + scoring both read as 评测中.
+        // Only 'done' evaluations expose a 查看 (detail) entry — this is the
+        // hard gate that prevents opening the detail page before unblinding.
+        const inProgress = e.status === "running" || e.status === "scoring";
+        let badge, action;
+        if (e.status === "done") {
+          badge = evalStatusBadge("done");
+          action = `<a href="evaluation-run.html?id=${e.id}" class="text-[12px] text-black/65 hover:text-black hover:underline">查看</a>`;
+        } else if (e.status === "cancelled") {
+          badge = evalStatusBadge("cancelled");
+          action = `<span class="text-[12px] text-black/30">—</span>`;
+        } else if (inProgress) {
+          badge = `<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded text-[11px] font-medium" style="color:#b45309;background:#fffbeb"><span class="w-1.5 h-1.5 rounded-full" style="background:#b45309"></span>评测中</span>`;
+          // Blind scoring can resume only when open tasks await scoring.
+          action = (e.awaiting_scoring && e.has_open_tasks)
+            ? `<a href="blind-scoring.html?id=${e.id}" class="text-[12px] text-[#b45309] hover:underline font-medium">继续盲评</a>`
+            : `<span class="text-[12px] text-black/30">运行中</span>`;
+        } else {
+          badge = evalStatusBadge(e.status);
+          action = `<span class="text-[12px] text-black/30">—</span>`;
+        }
+        return `
+        <tr class="border-t border-black/[0.05] ${i % 2 ? "bg-[#fcfcfc]" : ""}">
+          <td class="px-3 py-2.5 font-medium">${escapeHtml(e.name)}</td>
+          <td class="px-3 py-2.5">${badge}</td>
+          <td class="px-3 py-2.5 mono text-[12px] text-black/65">${e.task_count}</td>
+          <td class="px-3 py-2.5 mono text-[12px] text-black/65">${e.model_count}</td>
+          <td class="px-3 py-2.5 mono text-[12px] text-black/45">${fmtTime(e.created_at)}</td>
+          <td class="px-3 py-2.5 text-right whitespace-nowrap">
+            ${action}
+            <button data-del="${e.id}" data-name="${escapeAttr(e.name)}" class="ml-3 text-[12px] text-[#b91c1c]/80 hover:text-[#b91c1c] hover:underline">删除</button>
+          </td>
+        </tr>`; }).join("");
+      tbody.querySelectorAll("button[data-del]").forEach((btn) => {
+        btn.onclick = async () => {
+          if (!confirm(`确定删除评测「${btn.dataset.name}」？该操作会级联删除其所有结果，且不可恢复。`)) return;
+          try {
+            await apiFetch(`/evaluations/${btn.dataset.del}`, { method: "DELETE" });
+            toast("已删除", "ok");
+            load();
+          } catch (err) {
+            toast(err.message, "error");
+          }
+        };
+      });
+      // Auto-refresh only while some evaluation is 评测中 (running/scoring);
+      // stop polling entirely when none remain so the page doesn't spin idle.
+      const anyInProgress = evals.some(
+        (e) => e.status === "running" || e.status === "scoring");
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      if (anyInProgress) pollTimer = setTimeout(load, POLL_MS);
+    } catch (err) {
+      // On transient error, keep trying if a poll was in flight.
+      toast("加载失败：" + err.message, "error");
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    }
+  }
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>盲评打分 · PLLM Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); text-decoration:none; }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+  .score-btn { transition: all .15s ease-out; }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <div id="sidebar"></div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <div class="flex items-center gap-3">
+        <h1 id="title" class="text-[18px] font-semibold">盲评打分</h1>
+        <span id="progressBadge" class="inline-flex items-center gap-1.5 h-5 px-2 rounded text-[11px] font-medium" style="color:#b45309;background:#fffbeb"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="submitBtn" disabled class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium opacity-40 pointer-events-none transition">提交本任务打分</button>
+        <a id="backLink" href="evaluations.html" class="h-8 px-3.5 rounded-md border border-black/16 text-[13px] text-black/75 hover:bg-[#f5f5f5] flex items-center">稍后再评</a>
+      </div>
+    </header>
+    <main class="flex-1 overflow-auto p-6">
+      <div id="taskNav" class="mb-4 flex flex-wrap gap-2"></div>
+      <div id="taskInfo" class="max-w-4xl mb-4"></div>
+      <p id="hint" class="text-[12px] text-black/45 mb-3 max-w-4xl"></p>
+      <div id="cards" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/blind-scoring-page.js"></script>
+</body>
+</html>

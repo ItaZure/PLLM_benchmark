@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>运行评测 · PLLM Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); text-decoration:none; }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:rgba(0,0,0,.4); box-shadow:0 0 0 3px rgba(0,0,0,.06); }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <div id="sidebar"></div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <h1 class="text-[18px] font-semibold">运行评测</h1>
+      <button id="btnCreate" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98] transition">创建并运行</button>
+    </header>
+    <main class="flex-1 overflow-auto p-6">
+      <div class="max-w-3xl space-y-5">
+        <div>
+          <label class="block text-[13px] font-medium mb-1.5">选择维度 <span class="text-red-600">*</span></label>
+          <select id="fDim" class="w-full h-8 px-2.5 text-[13px] border border-black/12 rounded-md bg-white"></select>
+          <p class="mt-1 text-[12px] text-black/45">任务与模型均限定在所选维度范围内（模型取维度白名单）。</p>
+        </div>
+        <div>
+          <label class="block text-[13px] font-medium mb-1.5">评测名称 <span class="text-red-600">*</span></label>
+          <input id="fName" placeholder="如 2026-07 中文写作专项" class="w-full h-8 px-2.5 text-[13px] border border-black/12 rounded-md placeholder:text-black/35" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="text-[13px] font-medium">任务与赋分（1-20）</div>
+            <div class="flex items-center gap-3 text-[12px]">
+              <button id="taskSelectAll" class="text-black/55 hover:text-black hover:underline">全选</button>
+              <span class="text-black/20">|</span>
+              <button id="taskInvert" class="text-black/55 hover:text-black hover:underline">反选</button>
+            </div>
+          </div>
+          <div id="taskList" class="border border-[var(--border)] rounded-lg divide-y divide-black/[0.05]"></div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="text-[13px] font-medium">参与模型（维度白名单，仅 chat 模型本阶段会执行）</div>
+            <div class="flex items-center gap-3 text-[12px]">
+              <button id="modelSelectAll" class="text-black/55 hover:text-black hover:underline">全选</button>
+              <span class="text-black/20">|</span>
+              <button id="modelInvert" class="text-black/55 hover:text-black hover:underline">反选</button>
+            </div>
+          </div>
+          <div id="modelList" class="border border-[var(--border)] rounded-lg divide-y divide-black/[0.05]"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/eval-new-page.js"></script>
+</body>
+</html>

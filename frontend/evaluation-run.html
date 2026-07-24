@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>评测详情 · PLLM Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); text-decoration:none; }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <div id="sidebar"></div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <div class="flex items-center gap-3">
+        <h1 id="title" class="text-[18px] font-semibold">评测</h1>
+        <span id="statusBadge"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="evaluations.html" class="h-8 px-3.5 rounded-md border border-black/16 text-[13px] text-black/75 hover:bg-[#f5f5f5] flex items-center">返回列表</a>
+      </div>
+    </header>
+    <main class="flex-1 overflow-auto p-6 space-y-4">
+      <div id="summary" class="border border-[var(--border)] rounded-lg p-4"></div>
+      <div class="border border-[var(--border)] rounded-lg overflow-hidden">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-[#fafafa] text-left text-[11px] uppercase tracking-wide text-black/50 font-medium">
+              <th class="h-9 px-3 font-medium">任务</th>
+              <th class="h-9 px-3 font-medium">模型</th>
+              <th class="h-9 px-3 font-medium">状态</th>
+              <th class="h-9 px-3 font-medium">得分</th>
+              <th class="h-9 px-3 font-medium">TTFT</th>
+              <th class="h-9 px-3 font-medium">字/秒</th>
+              <th class="h-9 px-3 font-medium">字符数</th>
+              <th class="h-9 px-3 font-medium">输出</th>
+            </tr>
+          </thead>
+          <tbody id="rows" class="text-[13px]"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/eval-run-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>盲评打分 · PLLM Benchmark</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --border: rgba(0,0,0,0.08); }
+  body { font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1a1a1a; }
+  .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .nav-item { height:36px; border-radius:6px; padding:0 12px; display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(0,0,0,.65); }
+  .nav-item:hover { background:#f0f0f0; }
+  .nav-item.active { background:#ececec; color:#1a1a1a; font-weight:500; }
+  .score-btn { transition: all .15s ease-out; }
+</style>
+</head>
+<body class="bg-white antialiased text-[13px]">
+<div class="flex h-screen overflow-hidden">
+  <aside class="w-[220px] shrink-0 bg-[#fafafa] border-r border-[var(--border)] flex flex-col">
+    <div class="h-14 flex items-center gap-2 px-4 border-b border-[var(--border)]">
+      <div class="w-6 h-6 rounded-md bg-[#1a1a1a] flex items-center justify-center text-white text-[12px] font-semibold">P</div>
+      <span class="text-[14px] font-semibold">PLLM Benchmark</span>
+    </div>
+    <nav class="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      <div class="px-3 pt-1 pb-1.5 text-[11px] font-medium tracking-wide text-black/40 uppercase">模型</div>
+      <a href="model-management.html" class="nav-item">Chat 模型</a>
+      <a href="#" class="nav-item">图片生成模型</a>
+      <div class="px-3 pt-3 pb-1.5 text-[11px] font-medium tracking-wide text-black/40 uppercase">Benchmark</div>
+      <a href="dimensions.html" class="nav-item">维度管理</a>
+      <a href="#" class="nav-item">任务管理</a>
+      <div class="px-3 pt-3 pb-1.5 text-[11px] font-medium tracking-wide text-black/40 uppercase">评测</div>
+      <a href="evaluation-run.html" class="nav-item">评测运行</a>
+      <a href="blind-scoring.html" class="nav-item active">盲评打分</a>
+      <a href="#" class="nav-item">历史结果</a>
+    </nav>
+    <div class="p-3 border-t border-[var(--border)]"><a href="index.html" class="text-[12px] text-black/45 hover:text-black">← Demo 索引</a></div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[18px] font-semibold">盲评打分</h1>
+        <span class="inline-flex items-center gap-1.5 h-5 px-2 rounded text-[11px] font-medium" style="color:#b45309;background:#fffbeb"><span class="w-1.5 h-1.5 rounded-full" style="background:#b45309"></span>已打分 <span id="scoredN" class="mono">0</span>/3</span>
+      </div>
+      <button id="submitBtn" onclick="submitScores()" disabled class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium opacity-40 pointer-events-none transition">提交打分</button>
+    </header>
+
+    <main class="flex-1 overflow-auto p-6">
+      <!-- 任务说明 -->
+      <div class="max-w-4xl mb-4 border border-[var(--border)] rounded-lg p-4 bg-[#fafafa]">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-[11px] uppercase tracking-wide text-black/40 font-medium">开放型任务 · 写作</span>
+        </div>
+        <p class="text-[14px] font-medium mb-2">写一段江南春景的描写，不少于 100 字</p>
+        <div class="text-[11px] uppercase tracking-wide text-black/40 font-medium mb-1">评分标准 Rubric</div>
+        <p class="text-[12px] text-black/60 leading-relaxed">1–5 分。考察画面感、语言优美程度、结构完整性。5 分为意境与文采俱佳，1 分为平淡或跑题。评分时请忽略模型身份，仅看文本质量。</p>
+      </div>
+      <p class="text-[12px] text-black/45 mb-3 max-w-4xl">以下 3 份输出已随机打乱、隐藏模型名称。请为每份独立打分。</p>
+      <div id="cards" class="grid grid-cols-1 lg:grid-cols-3 gap-3 max-w-6xl"></div>
+    </main>
+  </div>
+</div>
+<script>
+// 真实模型名对用户隐藏，仅结果页揭晓
+const raw = [
+  { model:'GPT-4o', text:'江南的三月，细雨裹着新绿悄然而至。石桥下的流水泛起圈圈涟漪，岸边的垂柳抽出嫩芽，随风轻摆。远处白墙黛瓦掩映在薄雾之中，几声燕语划破清晨的宁静，整座水乡像被温柔地唤醒。' },
+  { model:'Claude Opus 4', text:'春回江南，烟雨迷蒙。青石板路被雨水洗得发亮，两旁的杏花开得正好，粉白的花瓣落在乌篷船头。撑伞的行人缓步而过，倒影在河面上摇碎又重聚，一派温润恬静的水墨意境。' },
+  { model:'DeepSeek V3', text:'江南春天到了，天气变暖，树也绿了。河边有很多花，风吹过来很舒服。人们在河边散步，觉得心情很好。这里的风景不错，值得一看。' },
+];
+
+// 打乱顺序并贴上 输出 A/B/C 标签
+const shuffled = raw.map((o,i)=>({...o, _i:i})).sort(()=>Math.random()-0.5)
+  .map((o,idx)=>({ ...o, label:'输出 '+String.fromCharCode(65+idx), score:null }));
+
+function render(){
+  document.getElementById('cards').innerHTML = shuffled.map((o,i)=>`
+    <div class="border ${o.score?'border-black/16':'border-[var(--border)]'} rounded-lg flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-4 h-10 bg-[#fafafa] border-b border-black/[0.05]">
+        <span class="text-[13px] font-semibold">${o.label}</span>
+        ${o.score?`<span class="text-[11px] mono text-black/55">已打 ${o.score} 分</span>`:'<span class="text-[11px] text-black/35">未打分</span>'}
+      </div>
+      <div class="px-4 py-3 flex-1">
+        <p class="text-[13px] leading-relaxed text-black/80 whitespace-pre-wrap">${o.text}</p>
+        <div class="mt-2 text-[12px] mono text-black/40">${o.text.length} 字</div>
+      </div>
+      <div class="px-4 py-3 border-t border-black/[0.05]">
+        <div class="text-[11px] uppercase tracking-wide text-black/40 font-medium mb-1.5">打分（1–5）</div>
+        <div class="flex gap-1.5">
+          ${[1,2,3,4,5].map(n=>`
+            <button onclick="setScore(${i},${n})" class="score-btn w-9 h-9 rounded-md border text-[13px] font-medium
+              ${o.score===n?'bg-[#1a1a1a] text-white border-[#1a1a1a]':'border-black/16 text-black/65 hover:bg-[#f5f5f5]'}">${n}</button>`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function setScore(i,n){ shuffled[i].score=n; render(); refreshSubmit(); }
+
+function refreshSubmit(){
+  const scored = shuffled.filter(o=>o.score!==null).length;
+  document.getElementById('scoredN').textContent = scored;
+  const btn=document.getElementById('submitBtn');
+  const all = scored===shuffled.length;
+  btn.disabled=!all;
+  btn.classList.toggle('opacity-40', !all);
+  btn.classList.toggle('pointer-events-none', !all);
+}
+
+function submitScores(){
+  const reveal = shuffled.map(o=>`${o.label} = ${o.model} → ${o.score} 分`).join('\n');
+  alert('打分已提交（mock）。结果页揭晓归属：\n\n'+reveal);
+}
+
+render(); refreshSubmit();
+</script>
+
+</body>
+</html>
