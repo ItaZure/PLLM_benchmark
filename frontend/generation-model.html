@@ -23,20 +23,18 @@
   <div class="flex-1 flex flex-col min-w-0">
     <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)]">
       <h1 class="text-[18px] font-semibold">评测生成模型</h1>
-      <button id="btnSave" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98] transition">保存</button>
+      <button id="btnSaveAll" class="h-8 px-3.5 rounded-md bg-[#1a1a1a] text-white text-[13px] font-medium hover:bg-black active:scale-[0.98] transition">保存全部</button>
     </header>
     <main class="flex-1 overflow-auto p-6">
       <div class="max-w-2xl space-y-5">
         <p class="text-[13px] text-black/55 leading-relaxed">
-          选择一个 Chat 模型作为 AI 辅助出题的生成器。在任务管理里点击【自动生成】时，
-          将用这个模型根据维度与任务类型生成题目。此设置全局生效。
+          为每个维度单独设置 AI 出题用的生成模型。在任务管理里点击【自动生成】时，
+          将使用该维度对应的模型生成题目。选项来自 Chat 模型列表。
         </p>
-        <div>
-          <label class="block text-[13px] font-medium mb-1.5">生成模型（单选）</label>
-          <select id="fModel" class="w-full h-9 px-2.5 text-[13px] border border-black/12 rounded-md bg-white"></select>
-          <p class="mt-1.5 text-[12px] text-black/45">选项来自 Chat 模型列表。建议选一个稳定、指令遵循好的模型。</p>
+        <div id="dimList" class="space-y-3"></div>
+        <div id="emptyState" class="hidden text-[13px] text-black/40">
+          暂无维度。请先在<a href="/dimensions.html" class="underline ml-0.5">维度管理</a>中添加维度。
         </div>
-        <div id="current" class="text-[12px] text-black/50"></div>
       </div>
     </main>
   </div>

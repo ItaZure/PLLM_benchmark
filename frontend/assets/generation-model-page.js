@@ -1,64 +1,96 @@
-// Generation-model settings page: single-select a chat model as the AI
-// task-generator. Reads /settings/generation-model and the chat model list.
+// Per-dimension generation model settings page.
 (function () {
   let chatModels = [];
-  let currentId = "";
+  // Map dim.id -> current generation_model_id (string or "")
+  const pending = {};
 
   document.getElementById("sidebar").innerHTML = renderSidebar("generation-model");
 
   async function load() {
     try {
-      const [models, setting] = await Promise.all([
+      const [modelsRes, dimsRes] = await Promise.all([
         apiFetch("/models/chat"),
-        apiFetch("/settings/generation-model"),
+        apiFetch("/dimensions"),
       ]);
-      chatModels = models.data;
-      currentId = setting.data.generation_chat_model_id || "";
-      renderOptions();
-      renderCurrent(setting.data);
+      chatModels = modelsRes.data;
+      renderDimensions(dimsRes.data);
     } catch (e) {
       toast("加载失败：" + e.message, "error");
     }
   }
 
-  function renderOptions() {
-    const sel = document.getElementById("fModel");
+  function buildOptions(selectedId) {
+    const none = `<option value="">（未设置）</option>`;
     if (chatModels.length === 0) {
-      sel.innerHTML = `<option value="">（请先在 Chat 模型页添加模型）</option>`;
-      return;
+      return `<option value="">（请先在 Chat 模型页添加模型）</option>`;
     }
     const opts = chatModels.map((m) =>
-      `<option value="${m.id}" ${m.id === currentId ? "selected" : ""}>${escapeHtml(m.name)}（${escapeHtml(m.model_name)}）</option>`
+      `<option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>${escapeHtml(m.name)}（${escapeHtml(m.model_name)}）</option>`
     ).join("");
-    // Allow clearing the selection.
-    sel.innerHTML = `<option value="">（未设置）</option>` + opts;
-    sel.value = currentId;
+    return none + opts;
   }
 
-  function renderCurrent(data) {
-    const el = document.getElementById("current");
-    if (data.generation_chat_model_id) {
-      el.textContent = `当前生成模型：${data.display_name}（${data.model_name}）`;
-    } else {
-      el.textContent = "当前未设置生成模型。";
+  function renderDimensions(dims) {
+    const container = document.getElementById("dimList");
+    const empty = document.getElementById("emptyState");
+    if (!dims || dims.length === 0) {
+      container.innerHTML = "";
+      empty.classList.remove("hidden");
+      return;
     }
-  }
+    empty.classList.add("hidden");
+    container.innerHTML = dims.map((dim) => {
+      const selId = dim.generation_model_id || "";
+      pending[dim.id] = selId;
+      return `
+        <div class="border border-black/10 rounded-lg p-4 space-y-2">
+          <div class="font-medium text-[13px]">${escapeHtml(dim.name)}</div>
+          ${dim.description ? `<div class="text-[12px] text-black/45">${escapeHtml(dim.description)}</div>` : ""}
+          <select
+            class="w-full h-9 px-2.5 text-[13px] border border-black/12 rounded-md bg-white"
+            data-dim-id="${dim.id}"
+          >${buildOptions(selId)}</select>
+        </div>`;
+    }).join("");
 
-  async function save() {
-    const id = document.getElementById("fModel").value;
-    try {
-      const res = await apiFetch("/settings/generation-model", {
-        method: "PUT",
-        body: JSON.stringify({ generation_chat_model_id: id || null }),
+    container.querySelectorAll("select[data-dim-id]").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        pending[sel.dataset.dimId] = sel.value;
       });
-      currentId = res.data.generation_chat_model_id || "";
-      renderCurrent(res.data);
-      toast("已保存", "ok");
-    } catch (e) {
-      toast("保存失败：" + e.message, "error");
+    });
+  }
+
+  async function saveAll() {
+    const btn = document.getElementById("btnSaveAll");
+    btn.disabled = true;
+    btn.textContent = "保存中…";
+    let ok = 0;
+    let fail = 0;
+    try {
+      await Promise.all(
+        Object.entries(pending).map(async ([dimId, modelId]) => {
+          try {
+            await apiFetch(`/dimensions/${dimId}`, {
+              method: "PUT",
+              body: JSON.stringify({ generation_model_id: modelId || null }),
+            });
+            ok++;
+          } catch (e) {
+            fail++;
+          }
+        })
+      );
+      if (fail === 0) {
+        toast("已保存全部维度设置", "ok");
+      } else {
+        toast(`${ok} 个成功，${fail} 个失败`, "error");
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "保存全部";
     }
   }
 
-  document.getElementById("btnSave").onclick = save;
+  document.getElementById("btnSaveAll").onclick = saveAll;
   load();
 })();

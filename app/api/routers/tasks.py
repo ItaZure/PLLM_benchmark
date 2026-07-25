@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routers.settings import get_generation_model
 from app.db.session import get_db
 from app.models.dimension import Dimension
+from app.models.model import ChatModel
 from app.models.task import Task
 from app.schemas.task import (
     TaskCreate,
@@ -76,11 +76,13 @@ async def generate_task_endpoint(
     dim = await db.get(Dimension, payload.dimension_id)
     if dim is None:
         raise HTTPException(status_code=400, detail="所属维度不存在")
-    model = await get_generation_model(db)
+    model: ChatModel | None = None
+    if dim.generation_model_id is not None:
+        model = await db.get(ChatModel, dim.generation_model_id)
     if model is None:
         raise HTTPException(
             status_code=400,
-            detail="尚未配置评测生成模型，请先在【评测生成模型】页面选择",
+            detail="该维度尚未配置评测生成模型，请先在【评测生成模型】页面选择",
         )
     try:
         result = await generate_task(

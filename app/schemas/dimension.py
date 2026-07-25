@@ -20,6 +20,7 @@ class DimensionUpdate(BaseModel):
     name: str | None = Field(None, max_length=100)
     description: str | None = None
     system_prompt: str | None = None
+    generation_model_id: uuid.UUID | None = None
 
 
 class WhitelistModelInfo(BaseModel):
@@ -39,6 +40,7 @@ class DimensionResponse(BaseModel):
     system_prompt: str | None = None
     task_count: int = 0
     sort_order: int = 0
+    generation_model_id: uuid.UUID | None = None
     whitelist: list[WhitelistModelInfo] = Field(default_factory=list)
     created_at: datetime
 

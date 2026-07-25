@@ -20,6 +20,10 @@ class Dimension(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Manual display order (ascending). Lower = shown first. Used by all dropdowns.
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Per-dimension AI task-generation model (chat only). Nullable = not configured.
+    generation_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True, default=None
+    )
 
     whitelist: Mapped[list["DimensionModelWhitelist"]] = relationship(
         back_populates="dimension",

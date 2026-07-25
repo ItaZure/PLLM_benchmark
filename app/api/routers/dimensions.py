@@ -68,6 +68,7 @@ async def _serialize(db: AsyncSession, dim: Dimension, name_lookup=None) -> dict
         system_prompt=dim.system_prompt,
         task_count=task_count or 0,
         sort_order=dim.sort_order,
+        generation_model_id=dim.generation_model_id,
         whitelist=whitelist,
         created_at=dim.created_at,
     ).model_dump()

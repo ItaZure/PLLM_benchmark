@@ -3,7 +3,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: pllm
-      POSTGRES_PASSWORD: pllm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: pllm_benchmark
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://pllm:pllm@db:5432/pllm_benchmark
+      DATABASE_URL: postgresql+asyncpg://pllm:${POSTGRES_PASSWORD}@db:5432/pllm_benchmark
       CORS_ORIGINS: http://localhost,http://localhost:8080,http://127.0.0.1:8080
       DEBUG: "false"
     depends_on:
